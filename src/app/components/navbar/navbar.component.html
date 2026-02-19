@@ -38,20 +38,38 @@
     </nav>
 
     <ng-container *ngIf="authState$ | async as authState">
-      <small *ngIf="authState.isAuthenticated && authState.username as username">
-        {{ username }}
-      </small>
-      <small class="text-danger" *ngIf="errorMessage">
-        {{ errorMessage }}
-      </small>
-      <a
-        class="btn-getstarted"
-        href="#"
-        (click)="onAuthAction($event, authState.isAuthenticated)"
-      >
-        {{ authState.isAuthenticated ? 'Logout' : 'Login' }}
-      </a>
+      <div class="auth-meta" *ngIf="authState.isAuthenticated; else guestTemplate">
+        <small>
+          Bonjour
+          {{ authState.firstName || authState.username || 'Utilisateur' }}
+          <ng-container *ngIf="authState.role">({{ authState.role }})</ng-container>
+        </small>
+        <a
+          class="btn-getstarted"
+          href="#"
+          (click)="onLogout($event)"
+        >
+          Logout
+        </a>
+      </div>
+
+      <ng-template #guestTemplate>
+        <a
+          class="btn-getstarted"
+          href="#"
+          (click)="openAuthModal('login'); $event.preventDefault()"
+        >
+          Login
+        </a>
+      </ng-template>
     </ng-container>
 
   </div>
 </header>
+
+<app-auth-modal
+  [isOpen]="isAuthModalOpen"
+  [activeTab]="authModalTab"
+  (closed)="closeAuthModal()"
+  (authenticated)="onAuthenticated()"
+></app-auth-modal>

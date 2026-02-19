@@ -7,10 +7,12 @@ import {
   HttpClientModule,
 } from '@angular/common/http';
 import { BrowserModule } from '@angular/platform-browser';
+import { ReactiveFormsModule } from '@angular/forms';
 
 import { initializeAuth } from './auth-init.factory';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
+import { AuthModalComponent } from './components/auth-modal/auth-modal.component';
 import { FooterComponent } from './components/footer/footer.component';
 import { HomeComponent } from './components/home/home.component';
 import { NavbarComponent } from './components/navbar/navbar.component';
@@ -23,10 +25,12 @@ import { AuthService } from './services/auth.service';
     NavbarComponent,
     FooterComponent,
     HomeComponent,
+    AuthModalComponent,
   ],
   imports: [
     BrowserModule,
     HttpClientModule,
+    ReactiveFormsModule,
     AppRoutingModule,
   ],
   providers: [

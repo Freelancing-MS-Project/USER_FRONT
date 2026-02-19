@@ -1,11 +1,19 @@
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import {
+  HttpClient,
+  HttpErrorResponse,
+  HttpHeaders,
+  HttpParams,
+} from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   BehaviorSubject,
   Observable,
   catchError,
+  firstValueFrom,
   map,
+  of,
+  switchMap,
   tap,
   throwError,
 } from 'rxjs';
@@ -16,18 +24,39 @@ interface KeycloakTokenResponse {
   readonly access_token: string;
   readonly refresh_token: string;
   readonly expires_in: number;
-  readonly refresh_expires_in: number;
-  readonly token_type: string;
-  readonly scope?: string;
+}
+
+export interface RegisterRequest {
+  readonly email: string;
+  readonly password: string;
+  readonly firstName: string;
+  readonly lastName: string;
+  readonly cin: string;
+  readonly role: 'Client' | 'Freelancer';
+}
+
+export interface UserProfile {
+  readonly email: string;
+  readonly firstName?: string;
+  readonly lastName?: string;
+  readonly cin?: string;
+  readonly role?: string;
+  readonly username?: string;
 }
 
 export interface AuthState {
   readonly isAuthenticated: boolean;
+  readonly firstName: string | null;
+  readonly role: string | null;
+  readonly email: string | null;
   readonly username: string | null;
 }
 
 const ANONYMOUS_STATE: AuthState = {
   isAuthenticated: false,
+  firstName: null,
+  role: null,
+  email: null,
   username: null,
 };
 
@@ -36,6 +65,10 @@ const ANONYMOUS_STATE: AuthState = {
 })
 export class AuthService {
   private readonly tokenEndpoint = SECURITY_CONFIG.keycloakTokenEndpoint;
+  private readonly registerEndpoint =
+    `${SECURITY_CONFIG.backendBaseUrl}/api/users/register`;
+  private readonly profileEndpoint =
+    `${SECURITY_CONFIG.backendBaseUrl}/api/users/me`;
 
   private readonly clientId = SECURITY_CONFIG.keycloakClientId;
 
@@ -57,20 +90,19 @@ export class AuthService {
   ) {}
 
   async initialize(): Promise<void> {
-    this.syncAuthState();
-  }
-
-  syncAuthState(): void {
     if (!this.hasValidToken()) {
       this.clearSession(false);
       return;
     }
 
+    this.syncAuthState();
     this.scheduleLogout();
-    this.authStateSubject.next({
-      isAuthenticated: true,
-      username: this.extractUsername(),
-    });
+
+    try {
+      await firstValueFrom(this.getUserProfile());
+    } catch {
+      // Keep token-based session even if profile endpoint is temporarily unavailable.
+    }
   }
 
   login(username: string, password: string): Observable<void> {
@@ -91,13 +123,58 @@ export class AuthService {
       .pipe(
         tap((response) => this.storeSession(response)),
         tap(() => this.syncAuthState()),
-        map(() => void 0),
-        catchError(() => throwError(() => new Error('INVALID_CREDENTIALS'))),
+        switchMap(() =>
+          this.getUserProfile().pipe(
+            map(() => void 0),
+            catchError(() => {
+              // Do not fail authentication if profile endpoint fails.
+              return of(void 0);
+            }),
+          ),
+        ),
+        catchError((error: unknown) => {
+          this.clearSession(false);
+
+          if (
+            error instanceof HttpErrorResponse &&
+            (error.status === 400 || error.status === 401)
+          ) {
+            return throwError(() => new Error('INVALID_CREDENTIALS'));
+          }
+
+          return throwError(() => new Error('LOGIN_UNAVAILABLE'));
+        }),
       );
   }
 
-  logout(redirectToLogin: boolean = true): void {
-    this.clearSession(redirectToLogin);
+  register(payload: RegisterRequest): Observable<void> {
+    return this.http.post<void>(this.registerEndpoint, payload).pipe(
+      switchMap(() => this.login(payload.email, payload.password)),
+      catchError((error: unknown) => {
+        return throwError(() => error);
+      }),
+    );
+  }
+
+  getUserProfile(): Observable<UserProfile> {
+    return this.http.get<UserProfile>(this.profileEndpoint).pipe(
+      tap((profile) => {
+        const tokenState = this.buildStateFromToken();
+
+        this.scheduleLogout();
+        this.authStateSubject.next({
+          isAuthenticated: tokenState.isAuthenticated,
+          firstName: profile.firstName ?? tokenState.firstName,
+          role: this.normalizeRole(profile.role) ?? tokenState.role,
+          email: profile.email ?? tokenState.email,
+          username:
+            profile.username ??
+            profile.email ??
+            tokenState.username ??
+            null,
+        });
+      }),
+    );
   }
 
   isAuthenticated(): boolean {
@@ -110,6 +187,19 @@ export class AuthService {
     }
 
     return localStorage.getItem(this.accessTokenStorageKey);
+  }
+
+  logout(redirectHome: boolean = true): void {
+    this.clearSession(redirectHome);
+  }
+
+  syncAuthState(): void {
+    if (!this.hasValidToken()) {
+      this.clearSession(false);
+      return;
+    }
+
+    this.authStateSubject.next(this.buildStateFromToken());
   }
 
   private hasValidToken(): boolean {
@@ -135,7 +225,7 @@ export class AuthService {
     localStorage.setItem(this.expiresAtStorageKey, String(expiresAt));
   }
 
-  private clearSession(redirectToLogin: boolean): void {
+  private clearSession(redirectHome: boolean): void {
     localStorage.removeItem(this.accessTokenStorageKey);
     localStorage.removeItem(this.refreshTokenStorageKey);
     localStorage.removeItem(this.expiresAtStorageKey);
@@ -147,8 +237,8 @@ export class AuthService {
 
     this.authStateSubject.next(ANONYMOUS_STATE);
 
-    if (redirectToLogin) {
-      void this.router.navigate(['/login']);
+    if (redirectHome) {
+      void this.router.navigate(['/home']);
     }
   }
 
@@ -182,22 +272,6 @@ export class AuthService {
     }, remainingMs);
   }
 
-  private extractUsername(): string | null {
-    const token = localStorage.getItem(this.accessTokenStorageKey);
-
-    if (!token) {
-      return null;
-    }
-
-    const payload = this.decodeJwtPayload(token);
-
-    if (!payload) {
-      return null;
-    }
-
-    return (payload['preferred_username'] as string | undefined) ?? null;
-  }
-
   private isTokenExpired(token: string): boolean {
     const payload = this.decodeJwtPayload(token);
 
@@ -212,6 +286,122 @@ export class AuthService {
     }
 
     return Date.now() >= exp * 1000;
+  }
+
+  private extractUsernameFromToken(): string | null {
+    return this.extractClaim('preferred_username') ?? this.extractClaim('email');
+  }
+
+  private buildStateFromToken(): AuthState {
+    return {
+      isAuthenticated: true,
+      firstName: this.extractClaim('given_name') ?? null,
+      role: this.extractRoleFromToken(),
+      email: this.extractClaim('email'),
+      username: this.extractUsernameFromToken(),
+    };
+  }
+
+  private extractRoleFromToken(): string | null {
+    const payload = this.decodeJwtPayload(
+      localStorage.getItem(this.accessTokenStorageKey) ?? '',
+    );
+
+    if (!payload) {
+      return null;
+    }
+
+    const roleCandidates = [
+      ...this.extractClientRoles(payload),
+      ...this.extractRealmRoles(payload),
+    ].filter((role) => !this.isTechnicalRole(role));
+
+    if (roleCandidates.length === 0) {
+      return null;
+    }
+
+    return this.formatRoleLabel(roleCandidates[0]);
+  }
+
+  private extractClientRoles(payload: Record<string, unknown>): string[] {
+    const resourceAccess = payload['resource_access'] as
+      | Record<string, { roles?: unknown[] }>
+      | undefined;
+
+    if (!resourceAccess) {
+      return [];
+    }
+
+    const clientRoles = resourceAccess[this.clientId]?.roles;
+
+    if (!Array.isArray(clientRoles)) {
+      return [];
+    }
+
+    return clientRoles.filter((role): role is string => typeof role === 'string');
+  }
+
+  private extractRealmRoles(payload: Record<string, unknown>): string[] {
+    const realmAccess = payload['realm_access'] as
+      | { roles?: unknown[] }
+      | undefined;
+
+    if (!realmAccess || !Array.isArray(realmAccess.roles)) {
+      return [];
+    }
+
+    return realmAccess.roles.filter(
+      (role): role is string => typeof role === 'string',
+    );
+  }
+
+  private isTechnicalRole(role: string): boolean {
+    const normalized = role.toLowerCase();
+
+    return (
+      normalized.startsWith('default-roles-') ||
+      normalized === 'offline_access' ||
+      normalized === 'uma_authorization'
+    );
+  }
+
+  private normalizeRole(role: string | null | undefined): string | null {
+    if (!role) {
+      return null;
+    }
+
+    if (this.isTechnicalRole(role)) {
+      return null;
+    }
+
+    return this.formatRoleLabel(role);
+  }
+
+  private formatRoleLabel(role: string): string {
+    const cleanedRole = role.replace(/^ROLE_/i, '');
+
+    return cleanedRole
+      .replace(/[_-]+/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  private extractClaim(claimName: string): string | null {
+    const token = localStorage.getItem(this.accessTokenStorageKey);
+
+    if (!token) {
+      return null;
+    }
+
+    const payload = this.decodeJwtPayload(token);
+
+    if (!payload) {
+      return null;
+    }
+
+    const claimValue = payload[claimName];
+
+    return typeof claimValue === 'string' ? claimValue : null;
   }
 
   private decodeJwtPayload(token: string): Record<string, unknown> | null {

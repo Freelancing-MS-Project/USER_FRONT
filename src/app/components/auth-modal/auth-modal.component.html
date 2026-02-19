@@ -1,0 +1,102 @@
+<div
+  class="auth-modal-backdrop"
+  *ngIf="isOpen"
+  (click)="onOverlayClick($event)"
+>
+  <section class="auth-modal" role="dialog" aria-modal="true">
+    <button
+      type="button"
+      class="close-btn"
+      aria-label="Fermer"
+      (click)="closeModal()"
+    >
+      ×
+    </button>
+
+    <div class="tabs">
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab === 'login'"
+        (click)="switchTab('login')"
+      >
+        Login
+      </button>
+      <button
+        type="button"
+        class="tab-btn"
+        [class.active]="activeTab === 'register'"
+        (click)="switchTab('register')"
+      >
+        Register
+      </button>
+    </div>
+
+    <p class="error-message" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+    <form
+      *ngIf="activeTab === 'login'"
+      [formGroup]="loginForm"
+      (ngSubmit)="submitLogin()"
+      class="form-grid"
+    >
+      <label>
+        Email
+        <input type="email" formControlName="email" />
+      </label>
+
+      <label>
+        Mot de passe
+        <input type="password" formControlName="password" />
+      </label>
+
+      <button class="submit-btn" type="submit" [disabled]="isSubmitting">
+        {{ isSubmitting ? 'Connexion...' : 'Se connecter' }}
+      </button>
+    </form>
+
+    <form
+      *ngIf="activeTab === 'register'"
+      [formGroup]="registerForm"
+      (ngSubmit)="submitRegister()"
+      class="form-grid"
+    >
+      <label>
+        Email
+        <input type="email" formControlName="email" />
+      </label>
+
+      <label>
+        Mot de passe
+        <input type="password" formControlName="password" />
+      </label>
+
+      <label>
+        Prénom
+        <input type="text" formControlName="firstName" />
+      </label>
+
+      <label>
+        Nom
+        <input type="text" formControlName="lastName" />
+      </label>
+
+      <label>
+        CIN
+        <input type="text" formControlName="cin" />
+      </label>
+
+      <label>
+        Role
+        <select formControlName="role">
+          <option value="Client">Client</option>
+          <option value="Freelancer">Freelancer</option>
+        </select>
+      </label>
+
+      <button class="submit-btn" type="submit" [disabled]="isSubmitting">
+        {{ isSubmitting ? 'Inscription...' : 'S\'inscrire' }}
+      </button>
+    </form>
+  </section>
+</div>

@@ -7,7 +7,8 @@ export interface SecurityConfiguration {
 }
 
 export const SECURITY_CONFIG: SecurityConfiguration = {
-  backendBaseUrl: 'http://localhost:8082',
+  // Use Angular dev proxy to avoid CORS issues while keeping backend context-path.
+  backendBaseUrl: '/backend/Projet_Micro_User_yahya',
   keycloakBaseUrl: 'http://localhost:8080',
   keycloakRealm: 'prospera',
   keycloakClientId: 'prospera-client',

@@ -1,0 +1,10 @@
+.auth-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.auth-meta small {
+  color: #24324a;
+  font-weight: 600;
+}

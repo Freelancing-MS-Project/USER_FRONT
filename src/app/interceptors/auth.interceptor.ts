@@ -8,11 +8,12 @@ import {
 import { Injectable } from '@angular/core';
 import { Observable, catchError, throwError } from 'rxjs';
 
+import { SECURITY_CONFIG } from '../core/config/security.config';
 import { AuthService } from '../services/auth.service';
 
 @Injectable()
 export class AuthInterceptor implements HttpInterceptor {
-  private readonly backendApiPrefix = 'http://localhost:8082/api/';
+  private readonly backendApiPrefix = `${SECURITY_CONFIG.backendBaseUrl}/api/`;
 
   constructor(private readonly authService: AuthService) {}
 
@@ -49,6 +50,13 @@ export class AuthInterceptor implements HttpInterceptor {
   }
 
   private shouldAttachToken(url: string): boolean {
+    const isRegisterEndpoint =
+      url.includes('/api/users/register') || url.endsWith('/users/register');
+
+    if (isRegisterEndpoint) {
+      return false;
+    }
+
     return (
       url.startsWith(this.backendApiPrefix) ||
       url.startsWith('/api/') ||
