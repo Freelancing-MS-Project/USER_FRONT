@@ -1,7 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { Observable } from 'rxjs';
+import { ActivatedRoute, Router } from '@angular/router';
+import { firstValueFrom, Observable } from 'rxjs';
 
-import { AppAuthService, AuthState } from '../../services/keycloak.service';
+import { AuthService, AuthState } from '../../services/auth.service';
 
 @Component({
   selector: 'app-navbar',
@@ -12,13 +13,18 @@ export class NavbarComponent implements OnInit {
   readonly authState$: Observable<AuthState>;
 
   authActionInProgress = false;
+  errorMessage: string | null = null;
 
-  constructor(private readonly appAuthService: AppAuthService) {
-    this.authState$ = this.appAuthService.authState$;
+  constructor(
+    private readonly authService: AuthService,
+    private readonly router: Router,
+    private readonly route: ActivatedRoute,
+  ) {
+    this.authState$ = this.authService.authState$;
   }
 
   async ngOnInit(): Promise<void> {
-    await this.appAuthService.syncAuthState();
+    this.authService.syncAuthState();
   }
 
   async onAuthAction(
@@ -26,6 +32,7 @@ export class NavbarComponent implements OnInit {
     isAuthenticated: boolean,
   ): Promise<void> {
     event.preventDefault();
+    this.errorMessage = null;
 
     if (this.authActionInProgress) {
       return;
@@ -35,11 +42,31 @@ export class NavbarComponent implements OnInit {
 
     try {
       if (isAuthenticated) {
-        await this.appAuthService.logout();
+        this.authService.logout();
         return;
       }
 
-      await this.appAuthService.login();
+      const username = window.prompt('Email');
+
+      if (!username || username.trim().length === 0) {
+        return;
+      }
+
+      const password = window.prompt('Mot de passe');
+
+      if (!password || password.length === 0) {
+        return;
+      }
+
+      await firstValueFrom(this.authService.login(username.trim(), password));
+
+      const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+
+      if (returnUrl) {
+        await this.router.navigateByUrl(returnUrl);
+      }
+    } catch {
+      this.errorMessage = 'Email ou mot de passe incorrect';
     } finally {
       this.authActionInProgress = false;
     }

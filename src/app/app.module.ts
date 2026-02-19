@@ -1,15 +1,21 @@
-import { APP_INITIALIZER, NgModule } from '@angular/core';
-import { HttpClientModule } from '@angular/common/http';
+import {
+  APP_INITIALIZER,
+  NgModule,
+} from '@angular/core';
+import {
+  HTTP_INTERCEPTORS,
+  HttpClientModule,
+} from '@angular/common/http';
 import { BrowserModule } from '@angular/platform-browser';
 
-import { KeycloakAngularModule, KeycloakService } from 'keycloak-angular';
-
+import { initializeAuth } from './auth-init.factory';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { FooterComponent } from './components/footer/footer.component';
 import { HomeComponent } from './components/home/home.component';
 import { NavbarComponent } from './components/navbar/navbar.component';
-import { initializeKeycloak } from './keycloak-init.factory';
+import { AuthInterceptor } from './interceptors/auth.interceptor';
+import { AuthService } from './services/auth.service';
 
 @NgModule({
   declarations: [
@@ -18,13 +24,22 @@ import { initializeKeycloak } from './keycloak-init.factory';
     FooterComponent,
     HomeComponent,
   ],
-  imports: [BrowserModule, HttpClientModule, AppRoutingModule, KeycloakAngularModule],
+  imports: [
+    BrowserModule,
+    HttpClientModule,
+    AppRoutingModule,
+  ],
   providers: [
     {
       provide: APP_INITIALIZER,
-      useFactory: initializeKeycloak,
+      useFactory: initializeAuth,
       multi: true,
-      deps: [KeycloakService],
+      deps: [AuthService],
+    },
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: AuthInterceptor,
+      multi: true,
     },
   ],
   bootstrap: [AppComponent],

@@ -7,29 +7,29 @@ import {
   UrlTree,
 } from '@angular/router';
 
-import { AppAuthService } from '../services/keycloak.service';
+import { AuthService } from '../services/auth.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class AuthGuard implements CanActivate {
   constructor(
-    private readonly appAuthService: AppAuthService,
+    private readonly authService: AuthService,
     private readonly router: Router,
   ) {}
 
-  async canActivate(
+  canActivate(
     _route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
-  ): Promise<boolean | UrlTree> {
-    await this.appAuthService.syncAuthState();
-
-    if (this.appAuthService.isLoggedIn()) {
+  ): boolean | UrlTree {
+    if (this.authService.isAuthenticated()) {
       return true;
     }
 
-    return this.router.createUrlTree(['/home'], {
-      queryParams: { returnUrl: state.url },
+    return this.router.createUrlTree(['/login'], {
+      queryParams: {
+        returnUrl: state.url,
+      },
     });
   }
 }

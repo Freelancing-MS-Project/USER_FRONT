@@ -1,93 +1,58 @@
 import {
-  HttpContextToken,
   HttpErrorResponse,
-  HttpInterceptorFn,
+  HttpEvent,
+  HttpHandler,
+  HttpInterceptor,
   HttpRequest,
 } from '@angular/common/http';
-import { inject } from '@angular/core';
-import { catchError, from, switchMap, throwError } from 'rxjs';
+import { Injectable } from '@angular/core';
+import { Observable, catchError, throwError } from 'rxjs';
 
-import { KeycloakService } from '../auth/keycloak.service';
-import { SECURITY_CONFIG } from '../core/config/security.config';
+import { AuthService } from '../services/auth.service';
 
-const RETRY_AFTER_REFRESH = new HttpContextToken<boolean>(() => false);
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+  private readonly backendApiPrefix = 'http://localhost:8082/api/';
 
-function isApiRequest(url: string): boolean {
-  const isAbsoluteUrl = /^https?:\/\//i.test(url);
+  constructor(private readonly authService: AuthService) {}
 
-  if (!isAbsoluteUrl) {
-    return url.startsWith('/api') || url.startsWith('api/');
+  intercept(
+    request: HttpRequest<unknown>,
+    next: HttpHandler,
+  ): Observable<HttpEvent<unknown>> {
+    if (!this.shouldAttachToken(request.url)) {
+      return next.handle(request);
+    }
+
+    const accessToken = this.authService.getToken();
+
+    if (!accessToken) {
+      this.authService.logout();
+      return next.handle(request);
+    }
+
+    const authorizedRequest = request.clone({
+      setHeaders: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    return next.handle(authorizedRequest).pipe(
+      catchError((error: unknown) => {
+        if (error instanceof HttpErrorResponse && error.status === 401) {
+          this.authService.logout();
+        }
+
+        return throwError(() => error);
+      }),
+    );
   }
 
-  try {
-    const requestUrl = new URL(url);
-    const backendUrl = new URL(SECURITY_CONFIG.backendBaseUrl);
-    return requestUrl.origin === backendUrl.origin;
-  } catch {
-    return false;
+  private shouldAttachToken(url: string): boolean {
+    return (
+      url.startsWith(this.backendApiPrefix) ||
+      url.startsWith('/api/') ||
+      url.startsWith('api/')
+    );
   }
 }
-
-async function withAuthorizationHeader(
-  request: HttpRequest<unknown>,
-  keycloakService: KeycloakService,
-): Promise<HttpRequest<unknown>> {
-  if (!isApiRequest(request.url)) {
-    return request;
-  }
-
-  const token = await keycloakService.getValidAccessToken();
-
-  if (!token) {
-    return request;
-  }
-
-  return request.clone({
-    setHeaders: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-}
-
-export const authInterceptor: HttpInterceptorFn = (request, next) => {
-  const keycloakService = inject(KeycloakService);
-
-  return from(withAuthorizationHeader(request, keycloakService)).pipe(
-    switchMap((authorizedRequest) =>
-      next(authorizedRequest).pipe(
-        catchError((error: unknown) => {
-          if (
-            !(error instanceof HttpErrorResponse) ||
-            error.status !== 401 ||
-            !isApiRequest(request.url) ||
-            authorizedRequest.context.get(RETRY_AFTER_REFRESH)
-          ) {
-            return throwError(() => error);
-          }
-
-          return from(keycloakService.forceRefreshToken()).pipe(
-            switchMap((refreshedToken) => {
-              if (!refreshedToken) {
-                void keycloakService.logout();
-                return throwError(() => error);
-              }
-
-              const retryRequest = authorizedRequest.clone({
-                context: authorizedRequest.context.set(RETRY_AFTER_REFRESH, true),
-                setHeaders: {
-                  Authorization: `Bearer ${refreshedToken}`,
-                },
-              });
-
-              return next(retryRequest);
-            }),
-            catchError((refreshError: unknown) => {
-              void keycloakService.logout();
-              return throwError(() => refreshError);
-            }),
-          );
-        }),
-      ),
-    ),
-  );
-};

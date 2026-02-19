@@ -41,6 +41,9 @@
       <small *ngIf="authState.isAuthenticated && authState.username as username">
         {{ username }}
       </small>
+      <small class="text-danger" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </small>
       <a
         class="btn-getstarted"
         href="#"

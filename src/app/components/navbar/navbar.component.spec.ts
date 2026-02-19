@@ -1,14 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { RouterTestingModule } from '@angular/router/testing';
 import { of } from 'rxjs';
 
 import { NavbarComponent } from './navbar.component';
-import { AppAuthService } from '../../services/keycloak.service';
+import { AuthService } from '../../services/auth.service';
 
-const appAuthServiceMock = {
+const authServiceMock = {
   authState$: of({ isAuthenticated: false, username: null }),
-  syncAuthState: jasmine.createSpy('syncAuthState').and.resolveTo(),
-  login: jasmine.createSpy('login').and.resolveTo(),
-  logout: jasmine.createSpy('logout').and.resolveTo(),
+  syncAuthState: jasmine.createSpy('syncAuthState'),
+  login: jasmine.createSpy('login').and.returnValue(of(void 0)),
+  logout: jasmine.createSpy('logout'),
 };
 
 describe('NavbarComponent', () => {
@@ -17,8 +18,9 @@ describe('NavbarComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
+      imports: [RouterTestingModule],
       declarations: [NavbarComponent],
-      providers: [{ provide: AppAuthService, useValue: appAuthServiceMock }],
+      providers: [{ provide: AuthService, useValue: authServiceMock }],
     })
     .compileComponents();
 
