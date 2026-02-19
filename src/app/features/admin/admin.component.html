@@ -1,0 +1,32 @@
+<section class="feature-card" *ngIf="users$ | async as users">
+  <h1>Admin (ADMIN role required)</h1>
+
+  <p>
+    This page is protected with <code>AuthGuard</code> +
+    <code>RoleGuard</code> and expects realm role <code>ADMIN</code>.
+    It calls <code>GET http://localhost:8082/api/users</code>.
+  </p>
+
+  <div *ngIf="users.length > 0; else noDataTemplate" class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Username</th>
+          <th>Email</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let user of users">
+          <td>{{ user.id }}</td>
+          <td>{{ user.username }}</td>
+          <td>{{ user.email }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ng-template #noDataTemplate>
+    <p>No users returned by backend, or request failed.</p>
+  </ng-template>
+</section>

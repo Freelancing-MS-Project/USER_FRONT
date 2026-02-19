@@ -1,0 +1,8 @@
+<button
+  class="action-btn"
+  type="button"
+  (click)="logout()"
+  [disabled]="loading()"
+>
+  {{ loading() ? 'Signing out...' : 'Logout' }}
+</button>

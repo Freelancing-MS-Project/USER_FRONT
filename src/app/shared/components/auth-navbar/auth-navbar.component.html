@@ -1,0 +1,26 @@
+<header class="auth-navbar" *ngIf="sessionState$ | async as session">
+  <div class="brand">
+    <a routerLink="/public">Prospera Portal</a>
+  </div>
+
+  <nav class="nav-links">
+    <a routerLink="/public" routerLinkActive="active">Public</a>
+    <a routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+    <a routerLink="/admin" routerLinkActive="active">Admin</a>
+    <a routerLink="/users" routerLinkActive="active">Users API</a>
+  </nav>
+
+  <div class="session-area">
+    <ng-container *ngIf="session.isAuthenticated; else loggedOutTemplate">
+      <div class="user-meta">
+        <strong>{{ session.username ?? 'unknown' }}</strong>
+        <small>{{ session.roles.length > 0 ? session.roles.join(', ') : 'No realm roles' }}</small>
+      </div>
+      <app-logout-button></app-logout-button>
+    </ng-container>
+
+    <ng-template #loggedOutTemplate>
+      <app-login-button></app-login-button>
+    </ng-template>
+  </div>
+</header>

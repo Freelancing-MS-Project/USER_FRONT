@@ -1,0 +1,14 @@
+<section class="feature-card" *ngIf="users$ | async as users">
+  <h2>Users Module</h2>
+  <p>This route uses the same secured backend call: <code>GET /api/users</code>.</p>
+
+  <ul *ngIf="users.length > 0; else noUsersTemplate">
+    <li *ngFor="let user of users">
+      {{ user.username }} ({{ user.email }})
+    </li>
+  </ul>
+
+  <ng-template #noUsersTemplate>
+    <p>No users returned by backend.</p>
+  </ng-template>
+</section>

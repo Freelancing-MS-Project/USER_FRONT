@@ -1,0 +1,11 @@
+.feature-card {
+  background: #ffffff;
+  border: 1px solid #d8dfea;
+  border-radius: 14px;
+  padding: 1.25rem;
+}
+
+ul {
+  margin: 0.75rem 0 0;
+  padding-left: 1.1rem;
+}
