@@ -13,6 +13,11 @@
       ×
     </button>
 
+    <div class="auth-modal-header">
+      <h3>{{ activeTab === 'login' ? 'Connexion' : 'Inscription' }}</h3>
+      <p>Accedez a votre espace en gardant le style du template.</p>
+    </div>
+
     <div class="tabs">
       <button
         type="button"
@@ -20,7 +25,7 @@
         [class.active]="activeTab === 'login'"
         (click)="switchTab('login')"
       >
-        Login
+        Connexion
       </button>
       <button
         type="button"
@@ -28,7 +33,7 @@
         [class.active]="activeTab === 'register'"
         (click)="switchTab('register')"
       >
-        Register
+        Inscription
       </button>
     </div>
 
@@ -42,12 +47,12 @@
     >
       <label>
         Email
-        <input type="email" formControlName="email" />
+        <input class="form-control" type="email" formControlName="email" />
       </label>
 
       <label>
         Mot de passe
-        <input type="password" formControlName="password" />
+        <input class="form-control" type="password" formControlName="password" />
       </label>
 
       <button class="submit-btn" type="submit" [disabled]="isSubmitting">
@@ -63,32 +68,32 @@
     >
       <label>
         Email
-        <input type="email" formControlName="email" />
+        <input class="form-control" type="email" formControlName="email" />
       </label>
 
       <label>
         Mot de passe
-        <input type="password" formControlName="password" />
+        <input class="form-control" type="password" formControlName="password" />
       </label>
 
       <label>
         Prénom
-        <input type="text" formControlName="firstName" />
+        <input class="form-control" type="text" formControlName="firstName" />
       </label>
 
       <label>
         Nom
-        <input type="text" formControlName="lastName" />
+        <input class="form-control" type="text" formControlName="lastName" />
       </label>
 
       <label>
         CIN
-        <input type="text" formControlName="cin" />
+        <input class="form-control" type="text" formControlName="cin" />
       </label>
 
       <label>
         Role
-        <select formControlName="role">
+        <select class="form-select" formControlName="role">
           <option value="Client">Client</option>
           <option value="Freelancer">Freelancer</option>
         </select>
